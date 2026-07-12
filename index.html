@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Multiport Link Checker</title>
+<meta name="description" content="Multiport Link Checker — a multi-engine link, file and text scanner that shows you exactly what it found, not just a trust score." />
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26"><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#g)"/><path d="M9 17.5 14 22.5 23 11" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop offset="0" stop-color="#0A84FF"/><stop offset="1" stop-color="#5E5CE6"/></linearGradient></defs></svg>
+      </span>
+      Multiport Link Checker
+    </a>
+    <nav class="nav-links">
+      <a href="#scanner">Scanner</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#more-apps">More apps</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero" id="scanner">
+    <h1>See what's actually inside a link.</h1>
+    <p class="hero-sub">Multiport runs every link, file, or message through a full breakdown of independent checks — not a single opaque "trust score." Look at the evidence yourself.</p>
+
+    <div class="scan-card">
+      <div class="segmented" role="tablist" aria-label="Scan type">
+        <button class="segment active" role="tab" aria-selected="true" data-tab="url">Link</button>
+        <button class="segment" role="tab" aria-selected="false" data-tab="file">File</button>
+        <button class="segment" role="tab" aria-selected="false" data-tab="text">Text</button>
+      </div>
+
+      <div class="tab-panel active" data-panel="url">
+        <input type="text" id="url-input" class="text-field" placeholder="Paste a link, e.g. https://example.com" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="tab-panel" data-panel="file">
+        <label class="dropzone" id="dropzone" for="file-input">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0-11 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span id="dropzone-label">Drop a file here, or click to choose one</span>
+          <input type="file" id="file-input" hidden />
+        </label>
+      </div>
+
+      <div class="tab-panel" data-panel="text">
+        <textarea id="text-input" class="text-field textarea" rows="5" placeholder="Paste a message, email, or text you want checked for scam signals…"></textarea>
+      </div>
+
+      <button class="scan-button" id="scan-button">
+        <span class="scan-button-label">Scan</span>
+      </button>
+      <p class="scan-disclaimer">Runs entirely in your browser. Files never leave your device — only a hash is computed locally.</p>
+    </div>
+  </section>
+
+  <section class="results" id="results" hidden>
+    <div class="results-card">
+      <div class="results-summary">
+        <div class="ring" id="ring">
+          <span class="ring-value" id="ring-value">0/0</span>
+        </div>
+        <div class="results-headline">
+          <div class="verdict" id="verdict">—</div>
+          <div class="verdict-target" id="verdict-target"></div>
+        </div>
+      </div>
+
+      <div class="engine-grid" id="engine-grid"></div>
+
+      <div class="verify-row" id="verify-row"></div>
+    </div>
+  </section>
+
+  <section class="downloads" id="downloads">
+    <h2>Get Multiport on your desktop</h2>
+    <p class="section-sub">Same scanner, right-click integration, and a menu bar / system tray shortcut.</p>
+    <div class="download-buttons">
+      <a class="download-btn" href="https://github.com/36elyanm/multiport-scanner-2/releases" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.462 2.223-1.219 3.03-.836.885-2.213 1.564-3.316 1.478-.14-1.1.44-2.264 1.184-3.06.826-.884 2.29-1.55 3.351-1.448zM20.5 17.29c-.552 1.264-.816 1.828-1.526 2.943-.99 1.55-2.388 3.482-4.12 3.5-1.535.015-1.93-1.005-4.01-.994-2.08.012-2.516 1.012-4.052.996-1.732-.017-3.056-1.76-4.047-3.31C.19 16.85-.55 12.03 1.09 9.03c1.15-2.09 3.02-3.31 4.782-3.31 1.802 0 2.936 1.008 4.427 1.008 1.446 0 2.328-1.01 4.428-1.01 1.573 0 3.24.858 4.428 2.34-3.89 2.13-3.257 7.69 1.345 9.23z"/></svg>
+        <span>
+          <strong>Download for Mac</strong>
+          <small>macOS 12 Monterey or later</small>
+        </span>
+      </a>
+      <a class="download-btn" href="https://github.com/36elyanm/multiport-scanner-2/releases" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.1 10 4v6.9H3V5.1zm0 13.8 7-1.1v-6.6H3v7.7zM11 3.9 21 2v8.9H11V3.9zm0 16.2 10-1.6v-8.4H11v10z"/></svg>
+        <span>
+          <strong>Download for Windows</strong>
+          <small>Windows 10 or later</small>
+        </span>
+      </a>
+    </div>
+  </section>
+
+  <section class="more-apps" id="more-apps">
+    <button class="more-apps-toggle" id="more-apps-toggle" aria-expanded="false">
+      <span>Other websites I made</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="more-apps-panel" id="more-apps-panel" hidden>
+      <a class="app-tile" href="https://multiportgames.pages.dev" target="_blank" rel="noopener">
+        <span class="app-tile-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="12" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M7 11v4M5 13h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="12" r="1.1" fill="currentColor"/><circle cx="18.2" cy="14.5" r="1.1" fill="currentColor"/></svg>
+        </span>
+        <span class="app-tile-text">
+          <strong>Multiport Games</strong>
+          <small>multiportgames.pages.dev</small>
+        </span>
+        <svg class="app-tile-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Multiport Link Checker — heuristic analysis runs locally in your browser.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
