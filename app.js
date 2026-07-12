@@ -291,6 +291,56 @@
     return { checks, hash };
   }
 
+  /* ---------- VirusTotal (via our own /api/* server functions) ---------- */
+
+  async function callApi(path, options) {
+    let res;
+    try {
+      res = await fetch(path, options);
+    } catch {
+      throw new Error("Couldn't reach the scan server.");
+    }
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error("Scan server returned an unexpected response.");
+    }
+    if (!res.ok) throw new Error(json.error || "VirusTotal lookup failed.");
+    return json;
+  }
+
+  function vtUrlReport(url) {
+    return callApi("/api/url-report", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+  }
+
+  function vtFileReport(hash) {
+    return callApi("/api/file-report", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ hash }),
+    });
+  }
+
+  function vtFileUpload(file) {
+    const fd = new FormData();
+    fd.append("file", file);
+    return callApi("/api/file-upload", { method: "POST", body: fd });
+  }
+
+  async function pollAnalysis(id, { attempts = 12, delayMs = 4000 } = {}) {
+    for (let i = 0; i < attempts; i++) {
+      const json = await callApi(`/api/analysis?id=${encodeURIComponent(id)}`);
+      if (json.status === "completed") return json;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    throw new Error("VirusTotal is still scanning this — check back in a moment.");
+  }
+
   /* ---------- Rendering ---------- */
 
   const resultsSection = document.getElementById("results");
@@ -301,6 +351,11 @@
   const engineGrid = document.getElementById("engine-grid");
   const verifyRow = document.getElementById("verify-row");
   const scanButton = document.getElementById("scan-button");
+  const vtSection = document.getElementById("vt-section");
+  const vtBadge = document.getElementById("vt-badge");
+  const vtNote = document.getElementById("vt-note");
+  const vtGrid = document.getElementById("vt-grid");
+  const vtUploadBtn = document.getElementById("vt-upload-btn");
 
   const ICONS = {
     clean: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -308,9 +363,35 @@
     info: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 8v5m0 3h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
   };
 
-  function renderResults(checks, targetLabel, extraLinks) {
-    const flagged = checks.filter((c) => c.status === "flagged").length;
-    const total = checks.length;
+  // Holds the currently displayed scan so the ring/verdict can be recomputed
+  // once the VirusTotal call resolves (heuristics render immediately, VT follows).
+  const current = { heuristicChecks: [], vtStats: null };
+
+  function engineCardHTML(status, name, detail) {
+    return `
+      <div class="engine-card">
+        <span class="engine-icon ${status}">${ICONS[status]}</span>
+        <div>
+          <div class="engine-name">${escapeHTML(name)}</div>
+          <div class="engine-detail">${escapeHTML(detail)}</div>
+        </div>
+      </div>`;
+  }
+
+  function vtCategoryStatus(category) {
+    if (category === "malicious" || category === "suspicious") return "flagged";
+    if (category === "harmless" || category === "undetected") return "clean";
+    return "info";
+  }
+
+  function updateSummary(targetLabel) {
+    let flagged = current.heuristicChecks.filter((c) => c.status === "flagged").length;
+    let total = current.heuristicChecks.length;
+
+    if (current.vtStats) {
+      flagged += (current.vtStats.malicious || 0) + (current.vtStats.suspicious || 0);
+      total += Object.values(current.vtStats).reduce((a, b) => a + b, 0);
+    }
 
     ringValue.textContent = `${flagged}/${total}`;
     const pct = total ? Math.round((flagged / total) * 100) : 0;
@@ -331,26 +412,99 @@
     verdictEl.textContent = verdictText;
     verdictEl.style.color = color;
     verdictTarget.textContent = targetLabel;
+  }
 
-    engineGrid.innerHTML = checks
-      .map(
-        (c) => `
-      <div class="engine-card">
-        <span class="engine-icon ${c.status}">${ICONS[c.status]}</span>
-        <div>
-          <div class="engine-name">${escapeHTML(c.name)}</div>
-          <div class="engine-detail">${escapeHTML(c.detail)}</div>
-        </div>
-      </div>`
-      )
-      .join("");
+  function renderHeuristics(checks, targetLabel, extraLinks) {
+    current.heuristicChecks = checks;
+    current.vtStats = null;
+    updateSummary(targetLabel);
+
+    engineGrid.innerHTML = checks.map((c) => engineCardHTML(c.status, c.name, c.detail)).join("");
 
     verifyRow.innerHTML = (extraLinks || [])
       .map((l) => `<a class="verify-link" href="${l.href}" target="_blank" rel="noopener">${escapeHTML(l.label)}</a>`)
       .join("");
 
+    vtSection.hidden = true;
+    vtGrid.innerHTML = "";
+    vtUploadBtn.hidden = true;
+    vtBadge.className = "vt-badge";
+    vtBadge.textContent = "";
+    vtNote.textContent = "";
+
     resultsSection.hidden = false;
     resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function setVtBadge(state, label) {
+    vtBadge.className = `vt-badge ${state}`;
+    vtBadge.textContent = label;
+  }
+
+  function showVtLoading(note) {
+    vtSection.hidden = false;
+    setVtBadge("loading", "Scanning…");
+    vtNote.textContent = note || "Checking VirusTotal's live database…";
+    vtUploadBtn.hidden = true;
+    vtGrid.innerHTML = "";
+  }
+
+  function showVtReport(targetLabel, report) {
+    current.vtStats = report.stats || {};
+    updateSummary(targetLabel);
+
+    const total = Object.values(current.vtStats).reduce((a, b) => a + b, 0);
+    const flagged = (current.vtStats.malicious || 0) + (current.vtStats.suspicious || 0);
+    setVtBadge("ready", `${flagged}/${total} vendors flagged`);
+    vtNote.textContent = "";
+    vtUploadBtn.hidden = true;
+
+    const sorted = [...(report.results || [])].sort((a, b) => {
+      const rank = { malicious: 0, suspicious: 1, timeout: 2, undetected: 3, harmless: 4, "type-unsupported": 5 };
+      return (rank[a.category] ?? 9) - (rank[b.category] ?? 9);
+    });
+
+    vtGrid.innerHTML = sorted
+      .map((r) => engineCardHTML(vtCategoryStatus(r.category), r.engine, r.result || r.category))
+      .join("");
+
+    if (report.permalink) {
+      verifyRow.insertAdjacentHTML(
+        "afterbegin",
+        `<a class="verify-link" href="${report.permalink}" target="_blank" rel="noopener">Open full report on VirusTotal ↗</a>`
+      );
+    }
+  }
+
+  function showVtError(message) {
+    vtSection.hidden = false;
+    setVtBadge("error", "Unavailable");
+    vtNote.textContent = message;
+    vtUploadBtn.hidden = true;
+    vtGrid.innerHTML = "";
+  }
+
+  function showVtUnknownFile(file) {
+    vtSection.hidden = false;
+    setVtBadge("unknown", "Not seen before");
+    vtNote.textContent = "VirusTotal has no record of this file's hash. Upload the file itself to get it scanned by their engines.";
+    vtUploadBtn.hidden = false;
+    vtUploadBtn.disabled = false;
+    vtUploadBtn.textContent = "Upload & scan with VirusTotal";
+    vtGrid.innerHTML = "";
+
+    vtUploadBtn.onclick = async () => {
+      vtUploadBtn.disabled = true;
+      vtUploadBtn.textContent = "Uploading…";
+      try {
+        const submit = await vtFileUpload(file);
+        showVtLoading("VirusTotal is scanning the uploaded file…");
+        const report = await pollAnalysis(submit.analysisId);
+        showVtReport(file.name, report);
+      } catch (err) {
+        showVtError(err.message);
+      }
+    };
   }
 
   function escapeHTML(str) {
@@ -371,22 +525,46 @@
         const raw = document.getElementById("url-input").value.trim();
         if (!raw) return;
         const checks = analyzeUrl(raw);
-        renderResults(checks, raw, [
-          { href: `https://www.virustotal.com/gui/search/${encodeURIComponent(raw)}`, label: "Check on VirusTotal ↗" },
+        renderHeuristics(checks, raw, [
           { href: `https://transparencyreport.google.com/safe-browsing/search?url=${encodeURIComponent(raw)}`, label: "Google Safe Browsing ↗" },
           { href: `https://urlscan.io/search/#${encodeURIComponent(raw)}`, label: "urlscan.io ↗" },
         ]);
+
+        showVtLoading();
+        try {
+          let report = await vtUrlReport(raw);
+          if (report.status === "queued") {
+            showVtLoading("First time seeing this link — VirusTotal is scanning it now…");
+            report = await pollAnalysis(report.analysisId);
+          }
+          showVtReport(raw, report);
+        } catch (err) {
+          showVtError(err.message);
+        }
       } else if (activeTab === "file") {
         if (!selectedFile) return;
-        const { checks, hash } = await analyzeFile(selectedFile);
-        const links = [];
-        if (hash) links.push({ href: `https://www.virustotal.com/gui/file/${hash}`, label: "Check hash on VirusTotal ↗" });
-        renderResults(checks, selectedFile.name, links);
+        const file = selectedFile;
+        const { checks, hash } = await analyzeFile(file);
+        renderHeuristics(checks, file.name, hash ? [{ href: `https://www.virustotal.com/gui/file/${hash}`, label: "Open file report on VirusTotal ↗" }] : []);
+
+        if (hash) {
+          showVtLoading("Checking this file's hash against VirusTotal…");
+          try {
+            const report = await vtFileReport(hash);
+            if (report.status === "unknown") {
+              showVtUnknownFile(file);
+            } else {
+              showVtReport(file.name, report);
+            }
+          } catch (err) {
+            showVtError(err.message);
+          }
+        }
       } else {
         const text = document.getElementById("text-input").value.trim();
         if (!text) return;
         const checks = analyzeText(text);
-        renderResults(checks, "Pasted text", [
+        renderHeuristics(checks, "Pasted text", [
           { href: "https://reportfraud.ftc.gov/", label: "Report to the FTC ↗" },
         ]);
       }

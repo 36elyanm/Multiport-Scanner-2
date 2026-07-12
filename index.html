@@ -61,7 +61,7 @@
       <button class="scan-button" id="scan-button">
         <span class="scan-button-label">Scan</span>
       </button>
-      <p class="scan-disclaimer">Runs entirely in your browser. Files never leave your device — only a hash is computed locally.</p>
+      <p class="scan-disclaimer">Links and file hashes are checked against VirusTotal's live database. Files themselves are only uploaded if you explicitly click "Upload &amp; scan."</p>
     </div>
   </section>
 
@@ -77,7 +77,20 @@
         </div>
       </div>
 
-      <div class="engine-grid" id="engine-grid"></div>
+      <div class="results-section">
+        <h3 class="results-section-title">Multiport Heuristics</h3>
+        <div class="engine-grid" id="engine-grid"></div>
+      </div>
+
+      <div class="results-section" id="vt-section" hidden>
+        <h3 class="results-section-title">
+          VirusTotal
+          <span class="vt-badge" id="vt-badge"></span>
+        </h3>
+        <p class="vt-note" id="vt-note"></p>
+        <button class="vt-upload-btn" id="vt-upload-btn" hidden>Upload &amp; scan with VirusTotal</button>
+        <div class="engine-grid" id="vt-grid"></div>
+      </div>
 
       <div class="verify-row" id="verify-row"></div>
     </div>
