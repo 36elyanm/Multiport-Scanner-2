@@ -1,0 +1,82 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "URL the desktop app should open (the live site)"
+        required: false
+        default: "https://multiportlinkchecker.michaelrelyan1.workers.dev"
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build with Nativefier
+        run: |
+          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" \
+            --name "Multiport Link Checker" \
+            --icon build-assets/icon.png \
+            --platform darwin \
+            --arch universal \
+            --out dist
+      - name: Zip app
+        run: |
+          cd dist
+          zip -r ../Multiport-Link-Checker-mac.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-app
+          path: Multiport-Link-Checker-mac.zip
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build with Nativefier
+        shell: bash
+        run: |
+          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" \
+            --name "Multiport Link Checker" \
+            --icon build-assets/icon.png \
+            --platform win32 \
+            --arch x64 \
+            --out dist
+      - name: Zip app
+        shell: pwsh
+        run: Compress-Archive -Path dist\* -DestinationPath Multiport-Link-Checker-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: Multiport-Link-Checker-windows.zip
+
+  release:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish (or replace) the "desktop-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete desktop-latest --yes --cleanup-tag || true
+          gh release create desktop-latest \
+            artifacts/mac-app/Multiport-Link-Checker-mac.zip \
+            artifacts/windows-app/Multiport-Link-Checker-windows.zip \
+            --title "Multiport Link Checker — Desktop (latest build)" \
+            --notes "Automated build produced with Nativefier, wrapping ${{ github.event.inputs.app_url }} in a native shell. Unsigned — macOS/Windows will show an unidentified-developer warning on first launch." \
+            --latest
