@@ -19,12 +19,11 @@ jobs:
           node-version: 20
       - name: Build with Nativefier
         run: |
-          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" \
+          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" dist \
             --name "Multiport Link Checker" \
             --icon build-assets/icon.png \
             --platform darwin \
-            --arch universal \
-            --out dist
+            --arch universal
       - name: Zip app
         run: |
           cd dist
@@ -45,12 +44,11 @@ jobs:
       - name: Build with Nativefier
         shell: bash
         run: |
-          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" \
+          npx --yes nativefier@latest "${{ github.event.inputs.app_url }}" dist \
             --name "Multiport Link Checker" \
             --icon build-assets/icon.png \
             --platform win32 \
-            --arch x64 \
-            --out dist
+            --arch x64
       - name: Zip app
         shell: pwsh
         run: Compress-Archive -Path dist\* -DestinationPath Multiport-Link-Checker-windows.zip
